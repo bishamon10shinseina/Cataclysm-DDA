@@ -356,9 +356,37 @@ void vehicle::turrets_aim_and_fire_single()
     }
     vehicle_part *turret = options[idx];
 
+    turret_aim_and_fire_reaim( *turret );
+}
+
+void vehicle::turret_aim_and_fire_reaim( vehicle_part &turret )
+{
     std::vector<vehicle_part *> turrets;
-    turrets.push_back( turret );
-    turrets_aim_and_fire( turrets );
+    turrets.push_back( &turret );
+    const int shots = turrets_aim_and_fire( turrets );
+
+    // Re-enter aiming with the same turret on the next turn, same as wielded guns do
+    const turret_data data = turret_query( turret );
+    if( shots > 0 && get_option<bool>( "AIM_AFTER_FIRING" ) &&
+        data.query() == turret_data::status::ready &&
+        !get_avatar().get_targetable_creatures( data.range(), false ).empty() ) {
+        const int part_idx = index_of_part( &turret );
+        uistate.open_menu = [part_idx]() {
+            avatar &u = get_avatar();
+            if( const optional_vpart_position ovp = get_map().veh_at( u.pos_abs() ) ) {
+                vehicle &veh = ovp->vehicle();
+                if( !ovp.part_with_feature( VPFLAG_CONTROLS, true ) ||
+                    part_idx < 0 || part_idx >= veh.part_count() ) {
+                    return;
+                }
+                vehicle_part &t = veh.part( part_idx );
+                if( veh.turret_query( t ).query() != turret_data::status::ready ) {
+                    return;
+                }
+                veh.turret_aim_and_fire_reaim( t );
+            }
+        };
+    }
 }
 
 bool vehicle::turrets_aim_and_fire_all_manual( bool show_msg )

@@ -2050,6 +2050,12 @@ class vehicle
          */
         int turrets_aim_and_fire( std::vector<vehicle_part *> &turrets );
 
+        /*
+         * Aim and fire a single turret, then queue re-aiming on the next turn
+         * if AIM_AFTER_FIRING is enabled and targets remain.
+         */
+        void turret_aim_and_fire_reaim( vehicle_part &turret );
+
     public:
         /**
          *  Try to assign a crew member (who must be a player ally) to a specific seat
