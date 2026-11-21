@@ -16,13 +16,16 @@
 #include "item_pocket.h"
 #include "itype.h"
 #include "messages.h"
+#include "map.h"
 #include "npc.h"
+#include "options.h"
 #include "pocket_type.h"
 #include "projectile.h"
 #include "ranged.h"
 #include "string_formatter.h"
 #include "translations.h"
 #include "uilist.h"
+#include "uistate.h"
 #include "value_ptr.h"
 #include "veh_type.h"
 #include "vehicle_selector.h"
@@ -370,7 +373,26 @@ bool vehicle::turrets_aim_and_fire_all_manual( bool show_msg )
         return false;
     }
 
-    turrets_aim_and_fire( turrets );
+    const int shots = turrets_aim_and_fire( turrets );
+
+    // Re-enter aiming on the next turn, same as wielded guns do
+    if( shots > 0 && get_option<bool>( "AIM_AFTER_FIRING" ) ) {
+        int max_range = 0;
+        for( vehicle_part *t : find_all_ready_turrets( true, false ) ) {
+            max_range = std::max( max_range, turret_query( *t ).range() );
+        }
+        if( max_range > 0 &&
+            !get_avatar().get_targetable_creatures( max_range, false ).empty() ) {
+            uistate.open_menu = []() {
+                avatar &u = get_avatar();
+                if( const optional_vpart_position ovp = get_map().veh_at( u.pos_abs() ) ) {
+                    if( ovp.part_with_feature( VPFLAG_CONTROLS, true ) ) {
+                        ovp->vehicle().turrets_aim_and_fire_all_manual();
+                    }
+                }
+            };
+        }
+    }
     return true;
 }
 

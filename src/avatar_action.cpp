@@ -57,6 +57,7 @@
 #include "translations.h"
 #include "type_id.h"
 #include "uilist.h"
+#include "uistate.h"
 #include "veh_type.h"
 #include "vehicle.h"
 #include "vpart_position.h"
@@ -850,10 +851,28 @@ bool avatar_action::fire_turret_manual( avatar &you, map &m, turret_data &turret
     g->temp_exit_fullscreen();
     target_handler::trajectory trajectory = target_handler::mode_turret_manual( you, turret );
 
+    bool fired = false;
     if( !trajectory.empty() ) {
-        turret.fire( you, &m, trajectory.back() );
+        fired = turret.fire( you, &m, trajectory.back() ) > 0;
     }
     g->reenter_fullscreen();
+
+    // Re-enter aiming on the next turn, same as wielded guns do
+    if( fired && get_option<bool>( "AIM_AFTER_FIRING" ) &&
+        turret.query() == turret_data::status::ready &&
+        !you.get_targetable_creatures( turret.range(), false ).empty() ) {
+        uistate.open_menu = []() {
+            avatar &u = get_avatar();
+            map &here = get_map();
+            if( const optional_vpart_position ovp = here.veh_at( u.pos_abs() ) ) {
+                if( turret_data t = ovp->vehicle().turret_query( u.pos_abs() ) ) {
+                    if( t.query() == turret_data::status::ready ) {
+                        avatar_action::fire_turret_manual( u, here, t );
+                    }
+                }
+            }
+        };
+    }
     return true;
 }
 
